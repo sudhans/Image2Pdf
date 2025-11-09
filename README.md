@@ -1,5 +1,7 @@
 # Image2Pdf
 
+[![Build and Lint](https://github.com/sudhans/Image2Pdf/actions/workflows/build.yml/badge.svg)](https://github.com/sudhans/Image2Pdf/actions/workflows/build.yml)
+
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 Image2Pdf is a simple Android application that allows you to select images from your device, organize them, and convert them into a single PDF file. The app is designed to be offline-first and private, processing all files directly on your device.
