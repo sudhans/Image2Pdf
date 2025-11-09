@@ -35,10 +35,6 @@ Image2Pdf is a simple Android application that allows you to select images from 
 *   [Coil](https://coil-kt.github.io/coil/) for image loading
 *   [Reorderable](https://github.com/burnout-crew/reorderable) for the reorderable list
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a pull request.
-
 ## License
 
 This project is licensed under the GNU General Public License v3.0. See the [LICENSE](LICENSE) file for details.
