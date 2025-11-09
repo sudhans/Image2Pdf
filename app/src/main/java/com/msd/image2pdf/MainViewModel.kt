@@ -18,10 +18,6 @@ class MainViewModel : ViewModel() {
         imageUris.addAll(uris)
     }
 
-    fun reorderImages(from: Int, to: Int) {
-        imageUris.add(to, imageUris.removeAt(from))
-    }
-
     fun removeImage(uri: Uri) {
         imageUris.remove(uri)
     }

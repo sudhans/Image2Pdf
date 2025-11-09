@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
@@ -55,10 +55,6 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.burnoutcrew.reorderable.ReorderableItem
-import org.burnoutcrew.reorderable.detectReorder
-import org.burnoutcrew.reorderable.rememberReorderableLazyListState
-import org.burnoutcrew.reorderable.reorderable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,8 +67,6 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
     var pdfFileName by remember { mutableStateOf("images.pdf") }
     var showDeleteConfirmDialog by remember { mutableStateOf<Uri?>(null) }
     var showAboutDialog by remember { mutableStateOf(false) }
-
-    val state = rememberReorderableLazyListState(onMove = { from, to -> viewModel.reorderImages(from.index, to.index) })
 
     Scaffold(
         topBar = {
@@ -105,7 +99,7 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
                     ) {
                         DropdownMenuItem(
                             text = { Text("About") },
-                            onClick = {
+                            onClick = { 
                                 showAboutDialog = true
                                 showMenu = false
                             }
@@ -125,39 +119,31 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             LazyColumn(
-                state = state.listState,
                 modifier = Modifier
                     .weight(1f)
-                    .reorderable(state)
             ) {
-                itemsIndexed(viewModel.imageUris, { _, item -> item.hashCode() }) { index, uri ->
-                    ReorderableItem(state, key = uri.hashCode()) {
-                        Card(
-                            modifier = Modifier
-                                .padding(4.dp)
-                                .fillMaxWidth()
-                                .detectReorder(state)
+                items(viewModel.imageUris, key = { it.hashCode() }) { uri ->
+                    Card(
+                        modifier = Modifier
+                            .padding(4.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                AsyncImage(
-                                    model = uri,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .padding(4.dp)
-                                )
-                                Row {
-                                    IconButton(onClick = { showDeleteConfirmDialog = uri }) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Delete")
-                                    }
-                                    IconButton(onClick = { showDialog = uri }) {
-                                        Icon(Icons.Default.Info, contentDescription = "Info")
-                                    }
-                                }
+                            IconButton(onClick = { showDialog = uri }) {
+                                Icon(Icons.Default.Info, contentDescription = "Info")
+                            }
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(4.dp)
+                            )
+                            IconButton(onClick = { showDeleteConfirmDialog = uri }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete")
                             }
                         }
                     }
