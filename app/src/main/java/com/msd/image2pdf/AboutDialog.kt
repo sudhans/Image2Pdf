@@ -84,7 +84,6 @@ fun AboutDialog(onDismiss: () -> Unit) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Installation Date: $installDate")
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Author: Madhusudhan Sarvodhaya", fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = annotatedString,
