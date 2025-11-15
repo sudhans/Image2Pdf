@@ -3,9 +3,11 @@ package com.msd.image2pdf
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.ImageDecoder
+import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.os.Environment
+import android.print.PrintAttributes
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.widget.Toast
@@ -55,6 +57,7 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.min
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,6 +100,13 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false }
                     ) {
+                        DropdownMenuItem(
+                            text = { Text("Settings") },
+                            onClick = { 
+                                navController.navigate("settings")
+                                showMenu = false 
+                            }
+                        )
                         DropdownMenuItem(
                             text = { Text("About") },
                             onClick = { 
@@ -263,17 +273,49 @@ private suspend fun createPdf(context: Context, imageUris: List<Uri>, fileName: 
             val pdfUri = resolver.insert(MediaStore.Files.getContentUri("external"), values)
                 ?: return@withContext Pair(false, "Could not create PDF file.")
 
+            val pageSize = AppSettings.getPageSize(context)
+
             imageUris.forEachIndexed { index, uri ->
                 val source = ImageDecoder.createSource(context.contentResolver, uri)
                 val bitmap = ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
                     decoder.isMutableRequired = true
                 }
 
-                val pageInfo = PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, index + 1).create()
-                val page = pdfDocument.startPage(pageInfo)
-                val canvas = page.canvas
-                canvas.drawBitmap(bitmap, 0f, 0f, null)
-                pdfDocument.finishPage(page)
+                when (pageSize) {
+                    PageSize.A4 -> {
+                        val a4Width = (PrintAttributes.MediaSize.ISO_A4.widthMils / 1000f * 72f).toInt()
+                        val a4Height = (PrintAttributes.MediaSize.ISO_A4.heightMils / 1000f * 72f).toInt()
+                        val pageInfo =
+                            PdfDocument.PageInfo.Builder(a4Width, a4Height, index + 1).create()
+                        val page = pdfDocument.startPage(pageInfo)
+                        val canvas = page.canvas
+
+                        val scale = min(
+                            a4Width.toFloat() / bitmap.width,
+                            a4Height.toFloat() / bitmap.height
+                        )
+
+                        val scaledWidth = bitmap.width * scale
+                        val scaledHeight = bitmap.height * scale
+
+                        val left = (a4Width - scaledWidth) / 2f
+                        val top = (a4Height - scaledHeight) / 2f
+
+                        val destRect = RectF(left, top, left + scaledWidth, top + scaledHeight)
+                        canvas.drawBitmap(bitmap, null, destRect, null)
+                        pdfDocument.finishPage(page)
+                    }
+
+                    PageSize.IMAGE_SIZE -> {
+                        val pageInfo =
+                            PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, index + 1)
+                                .create()
+                        val page = pdfDocument.startPage(pageInfo)
+                        val canvas = page.canvas
+                        canvas.drawBitmap(bitmap, 0f, 0f, null)
+                        pdfDocument.finishPage(page)
+                    }
+                }
                 bitmap.recycle()
             }
             resolver.openOutputStream(pdfUri)?.use {

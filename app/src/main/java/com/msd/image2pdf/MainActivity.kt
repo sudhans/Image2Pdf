@@ -91,6 +91,13 @@ class MainActivity : ComponentActivity() {
                                             onDismissRequest = { showMenu = false }
                                         ) {
                                             DropdownMenuItem(
+                                                text = { Text("Settings") },
+                                                onClick = {
+                                                    navController.navigate("settings")
+                                                    showMenu = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
                                                 text = { Text("About") },
                                                 onClick = {
                                                     showAboutDialog = true
@@ -129,7 +136,10 @@ class MainActivity : ComponentActivity() {
                         PreviewScreen(viewModel, navController)
                     }
                     composable("pdf_viewer") {
-                        PdfViewerScreen(viewModel)
+                        PdfViewerScreen(viewModel, navController)
+                    }
+                    composable("settings") {
+                        SettingsScreen(navController)
                     }
                 }
                 if (showAboutDialog) {
