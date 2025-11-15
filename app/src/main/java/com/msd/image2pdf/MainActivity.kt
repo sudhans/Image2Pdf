@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
                                             )
                                         }
                                     },
-                                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                                    colors = TopAppBarDefaults.topAppBarColors(
                                         containerColor = Color.Transparent
                                     )
                                 )

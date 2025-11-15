@@ -75,7 +75,7 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(text = stringResource(id = R.string.app_name))
                         Text(
-                            text = "Sort and Preview",
+                            text = "Edit and Preview",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -106,7 +106,7 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
                         )
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent
                 )
             )
@@ -261,10 +261,7 @@ private suspend fun createPdf(context: Context, imageUris: List<Uri>, fileName: 
 
             val resolver = context.contentResolver
             val pdfUri = resolver.insert(MediaStore.Files.getContentUri("external"), values)
-
-            if (pdfUri == null) {
-                return@withContext Pair(false, "Could not create PDF file.")
-            }
+                ?: return@withContext Pair(false, "Could not create PDF file.")
 
             imageUris.forEachIndexed { index, uri ->
                 val source = ImageDecoder.createSource(context.contentResolver, uri)
