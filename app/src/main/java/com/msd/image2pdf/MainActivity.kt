@@ -14,8 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -86,25 +84,12 @@ class MainActivity : ComponentActivity() {
                                         IconButton(onClick = { showMenu = !showMenu }) {
                                             Icon(Icons.Default.MoreVert, contentDescription = "More options")
                                         }
-                                        DropdownMenu(
-                                            expanded = showMenu,
-                                            onDismissRequest = { showMenu = false }
-                                        ) {
-                                            DropdownMenuItem(
-                                                text = { Text("Settings") },
-                                                onClick = {
-                                                    navController.navigate("settings")
-                                                    showMenu = false
-                                                }
-                                            )
-                                            DropdownMenuItem(
-                                                text = { Text("About") },
-                                                onClick = {
-                                                    showAboutDialog = true
-                                                    showMenu = false
-                                                }
-                                            )
-                                        }
+                                        OverflowMenu(
+                                            showMenu = showMenu,
+                                            onDismiss = { showMenu = false },
+                                            navController = navController,
+                                            onAboutClick = { showAboutDialog = true }
+                                        )
                                     },
                                     colors = TopAppBarDefaults.topAppBarColors(
                                         containerColor = Color.Transparent

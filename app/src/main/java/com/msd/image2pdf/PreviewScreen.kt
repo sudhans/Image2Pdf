@@ -2,6 +2,7 @@ package com.msd.image2pdf
 
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.graphics.ImageDecoder
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
@@ -27,8 +28,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -96,25 +95,12 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
                     IconButton(onClick = { showMenu = !showMenu }) {
                         Icon(Icons.Default.MoreVert, contentDescription = "More options")
                     }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Settings") },
-                            onClick = { 
-                                navController.navigate("settings")
-                                showMenu = false 
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("About") },
-                            onClick = { 
-                                showAboutDialog = true
-                                showMenu = false
-                            }
-                        )
-                    }
+                    OverflowMenu(
+                        showMenu = showMenu,
+                        onDismiss = { showMenu = false },
+                        navController = navController,
+                        onAboutClick = { showAboutDialog = true }
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent
