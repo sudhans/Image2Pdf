@@ -9,13 +9,14 @@ Image2Pdf is a simple Android application that allows you to select images from 
 ## Features
 
 *   **Select Multiple Images**: Pick one or more images from your device's gallery.
-*   **Preview and Reorder**: View your selected images in a list. Drag and drop to reorder them before creating the PDF.
+*   **Preview Images**: View your selected images in a list. Remove them via Delete icon.
 *   **Image Details**: View properties of each selected image, including name, size, and location.
 *   **Remove Images**: Easily remove unwanted images from your selection.
 *   **Create PDF**: Convert the ordered images into a PDF file. You can specify a name for your PDF.
 *   **Organized Storage**: All generated PDFs are saved in a dedicated `Image2Pdf` folder inside your device's `Downloads` directory.
 *   **View PDFs**: Access and view all the PDFs you've created directly from the app.
-*   **About Section**: Displays app version, installation date, and author information.
+*   **Settings**: You can set how the pdf is generated - Options are one image per page or include multiple images per page (if they are small)
+*    **About Section**: Displays app version, installation date, and author information.
 
 ## How to Use
 
