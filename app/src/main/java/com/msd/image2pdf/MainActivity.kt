@@ -106,7 +106,7 @@ class MainActivity : ComponentActivity() {
                                     text = stringResource(id = R.string.app_msg),
                                     modifier = Modifier.padding(16.dp)
                                 )
-                                Button(onClick = { launcher.launch("image/*") }) {
+                                Button(modifier = Modifier.padding(16.dp), onClick = { launcher.launch("image/*") }) {
                                     Text("Select Images")
                                 }
                                 if (viewModel.pdfFiles.isNotEmpty()) {

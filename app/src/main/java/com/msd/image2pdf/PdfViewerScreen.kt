@@ -1,12 +1,15 @@
 package com.msd.image2pdf
 
 import android.content.Intent
+import android.provider.MediaStore
 import android.provider.OpenableColumns
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -36,6 +39,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+private data class PdfFileDetails(
+    val name: String,
+    val size: Long,
+    val dateAdded: Long
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,10 +98,16 @@ fun PdfViewerScreen(viewModel: MainViewModel, navController: NavHostController) 
             )
         }
     ) { innerPadding ->
+        val sortedPdfDetails = remember(viewModel.pdfFiles) {
+            viewModel.pdfFiles
+                .mapNotNull { uri -> getPdfFileDetails(context, uri)?.let { details -> uri to details } }
+                .sortedByDescending { it.second.dateAdded }
+        }
+
         LazyColumn(
             modifier = Modifier.padding(innerPadding)
-        ) {
-            items(viewModel.pdfFiles) { uri ->
+        ) { 
+            items(sortedPdfDetails) { (uri, details) ->
                 Card(
                     modifier = Modifier
                         .padding(8.dp)
@@ -102,11 +120,31 @@ fun PdfViewerScreen(viewModel: MainViewModel, navController: NavHostController) 
                             context.startActivity(intent)
                         }
                 ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    Column(
+                        modifier = Modifier.padding(16.dp)
                     ) {
-                        Text(text = getFileName(context, uri) ?: "Unknown File")
+                        Text(
+                            text = details.name,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            val sizeInMb = details.size / (1024.0 * 1024.0)
+                            Text(
+                                text = String.format(Locale.getDefault(), "%.2f MB", sizeInMb),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            val formattedDate = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(details.dateAdded * 1000))
+                            Text(
+                                text = formattedDate,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -118,11 +156,17 @@ fun PdfViewerScreen(viewModel: MainViewModel, navController: NavHostController) 
     }
 }
 
-private fun getFileName(context: android.content.Context, uri: android.net.Uri): String? {
+private fun getPdfFileDetails(context: android.content.Context, uri: android.net.Uri): PdfFileDetails? {
     context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
         val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-        if (cursor.moveToFirst() && nameIndex != -1) {
-            return cursor.getString(nameIndex)
+        val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+        val dateAddedIndex = cursor.getColumnIndex(MediaStore.MediaColumns.DATE_ADDED)
+
+        if (cursor.moveToFirst()) {
+            val name = if (nameIndex != -1) cursor.getString(nameIndex) else "Unknown"
+            val size = if (sizeIndex != -1) cursor.getLong(sizeIndex) else 0L
+            val dateAdded = if (dateAddedIndex != -1) cursor.getLong(dateAddedIndex) else 0L
+            return PdfFileDetails(name, size, dateAdded)
         }
     }
     return null

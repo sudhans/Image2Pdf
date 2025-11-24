@@ -15,8 +15,10 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,6 +30,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -69,6 +72,7 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
     var pdfFileName by remember { mutableStateOf("images.pdf") }
     var showDeleteConfirmDialog by remember { mutableStateOf<Uri?>(null) }
     var showAboutDialog by remember { mutableStateOf(false) }
+    var isCreatingPdf by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -160,6 +164,25 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
         }
     }
 
+    if (isCreatingPdf) {
+        AlertDialog(
+            onDismissRequest = { /* Prevent dismissal */ },
+            title = { Text("Creating PDF File") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Please wait...")
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
     if (showFileNameDialog) {
         AlertDialog(
             onDismissRequest = { showFileNameDialog = false },
@@ -170,8 +193,10 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
                     onClick = {
                         showFileNameDialog = false
                         scope.launch {
+                            isCreatingPdf = true
                             val (success, errorMessage) = createPdf(context, viewModel.imageUris, pdfFileName)
                             withContext(Dispatchers.Main) {
+                                isCreatingPdf = false
                                 if (success) {
                                     Toast.makeText(context, "PDF created successfully", Toast.LENGTH_SHORT).show()
                                     navController.navigate("main") {
