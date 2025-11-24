@@ -9,26 +9,30 @@ Image2Pdf is a simple Android application that allows you to select images from 
 ## Features
 
 *   **Select Multiple Images**: Pick one or more images from your device's gallery.
-*   **Preview Images**: View your selected images in a list. Remove them via Delete icon.
-*   **Image Details**: View properties of each selected image, including name, size, and location.
-*   **Remove Images**: Easily remove unwanted images from your selection.
-*   **Create PDF**: Convert the ordered images into a PDF file. You can specify a name for your PDF.
+*   **Preview and Manage Images**: View your selected images in a list. Remove any unwanted images by tapping the delete icon.
+*   **Image Details**: View properties of each selected image, including its name, size, and location.
+*   **Flexible PDF Page Sizing**: Take full control over your PDF output with multiple page-sizing options:
+    *   **A4 - Print Friendly**: Automatically scales each image (up or down) to best fit a standard A4 page.
+    *   **A4 - Scale Down**: Fits larger images to an A4 page while keeping smaller images at their original size.
+    *   **A4 - No Scaling**: Centers each image on an A4 page without applying any scaling.
+    *   **A4 - Grid**: Intelligently arranges multiple images on a single A4 page, creating a compact grid and saving space.
+    *   **Image Size**: Creates a PDF where each page's size matches the original image's dimensions.
 *   **Organized Storage**: All generated PDFs are saved in a dedicated `Image2Pdf` folder inside your device's `Downloads` directory.
-*   **View PDFs**: Access and view all the PDFs you've created directly from the app.
-*   **Settings**: You can set how the pdf is generated - Options are one image per page or include multiple images per page (if they are small)
-*    **About Section**: Displays app version, installation date, and author information.
+*   **View and Manage PDFs**: Access and view all the PDFs you've created directly from the app, sorted by creation date.
+*   **Share Your App**: Easily share a link to the app with others via the overflow menu.
+*   **About Section**: Displays app version, installation date, author information, and a link to the source code.
 
 ## How to Use
 
 1.  Tap the "Select Images" button to choose images from your device.
 2.  On the preview screen, you can:
-    *   Drag and drop images to change their order.
     *   Tap the delete icon to remove an image.
     *   Tap the info icon to see file details.
-3.  Tap the "Convert To PDF" button.
-4.  Enter a name for your PDF file and tap "Save."
-5.  After the PDF is created, you can find it in the `Downloads/Image2Pdf` folder on your device.
-6.  Tap the "View PDF Files" button on the main screen to see a list of all your created PDFs and open them.
+3.  Go to "Settings" from the overflow menu to select your desired PDF page option.
+4.  Tap the "Convert To PDF" button.
+5.  Enter a name for your PDF file and tap "Save."
+6.  After the PDF is created, you can find it in the `Downloads/Image2Pdf` folder on your device.
+7.  Tap the "View PDF Files" button on the main screen to see a list of all your created PDFs and open them.
 
 ## Technology Stack
 
@@ -36,7 +40,6 @@ Image2Pdf is a simple Android application that allows you to select images from 
 *   [Jetpack Compose](https://developer.android.com/jetpack/compose)
 *   [Material 3](https://m3.material.io/)
 *   [Coil](https://coil-kt.github.io/coil/) for image loading
-*   [Reorderable](https://github.com/burnout-crew/reorderable) for the reorderable list
 
 ## License
 

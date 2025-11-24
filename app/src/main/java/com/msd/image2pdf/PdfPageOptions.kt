@@ -4,7 +4,10 @@ import android.content.Context
 
 enum class PageSize {
     A4,
-    IMAGE_SIZE
+    A4_SCALE_DOWN,
+    A4_NO_SCALING,
+    IMAGE_SIZE,
+    A4_GRID
 }
 
 object AppSettings {

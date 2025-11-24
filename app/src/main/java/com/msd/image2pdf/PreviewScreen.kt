@@ -3,6 +3,7 @@ package com.msd.image2pdf
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
@@ -59,6 +60,7 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.max
 import kotlin.math.min
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -286,49 +288,19 @@ private suspend fun createPdf(context: Context, imageUris: List<Uri>, fileName: 
 
             val pageSize = AppSettings.getPageSize(context)
 
-            imageUris.forEachIndexed { index, uri ->
-                val source = ImageDecoder.createSource(context.contentResolver, uri)
-                val bitmap = ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-                    decoder.isMutableRequired = true
-                }
-
-                when (pageSize) {
-                    PageSize.A4 -> {
-                        val a4Width = (PrintAttributes.MediaSize.ISO_A4.widthMils / 1000f * 72f).toInt()
-                        val a4Height = (PrintAttributes.MediaSize.ISO_A4.heightMils / 1000f * 72f).toInt()
-                        val pageInfo =
-                            PdfDocument.PageInfo.Builder(a4Width, a4Height, index + 1).create()
-                        val page = pdfDocument.startPage(pageInfo)
-                        val canvas = page.canvas
-
-                        val scale = min(
-                            a4Width.toFloat() / bitmap.width,
-                            a4Height.toFloat() / bitmap.height
-                        )
-
-                        val scaledWidth = bitmap.width * scale
-                        val scaledHeight = bitmap.height * scale
-
-                        val left = (a4Width - scaledWidth) / 2f
-                        val top = (a4Height - scaledHeight) / 2f
-
-                        val destRect = RectF(left, top, left + scaledWidth, top + scaledHeight)
-                        canvas.drawBitmap(bitmap, null, destRect, null)
-                        pdfDocument.finishPage(page)
+            if (pageSize == PageSize.A4_GRID) {
+                addImagesInGrid(pdfDocument, imageUris, context)
+            } else {
+                imageUris.forEachIndexed { index, uri ->
+                    val source = ImageDecoder.createSource(context.contentResolver, uri)
+                    val bitmap = ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                        decoder.isMutableRequired = true
                     }
-
-                    PageSize.IMAGE_SIZE -> {
-                        val pageInfo =
-                            PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, index + 1)
-                                .create()
-                        val page = pdfDocument.startPage(pageInfo)
-                        val canvas = page.canvas
-                        canvas.drawBitmap(bitmap, 0f, 0f, null)
-                        pdfDocument.finishPage(page)
-                    }
+                    addPageWithSingleImage(pdfDocument, index + 1, bitmap, pageSize)
+                    bitmap.recycle()
                 }
-                bitmap.recycle()
             }
+
             resolver.openOutputStream(pdfUri)?.use {
                 pdfDocument.writeTo(it)
             }
@@ -340,6 +312,88 @@ private suspend fun createPdf(context: Context, imageUris: List<Uri>, fileName: 
             pdfDocument.close()
         }
     }
+}
+
+private fun addPageWithSingleImage(pdfDocument: PdfDocument, pageNumber: Int, bitmap: Bitmap, pageSize: PageSize) {
+    val a4Width = (PrintAttributes.MediaSize.ISO_A4.widthMils / 1000f * 72f).toInt()
+    val a4Height = (PrintAttributes.MediaSize.ISO_A4.heightMils / 1000f * 72f).toInt()
+
+    val (pageWidth, pageHeight) = when (pageSize) {
+        PageSize.A4, PageSize.A4_SCALE_DOWN, PageSize.A4_NO_SCALING -> a4Width to a4Height
+        PageSize.IMAGE_SIZE -> bitmap.width to bitmap.height
+        else -> a4Width to a4Height // Should not happen in this function
+    }
+
+    val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+    val page = pdfDocument.startPage(pageInfo)
+    val canvas = page.canvas
+
+    val scale = when (pageSize) {
+        PageSize.A4 -> min(pageWidth.toFloat() / bitmap.width, pageHeight.toFloat() / bitmap.height)
+        PageSize.A4_SCALE_DOWN -> if (bitmap.width > pageWidth || bitmap.height > pageHeight) {
+            min(pageWidth.toFloat() / bitmap.width, pageHeight.toFloat() / bitmap.height)
+        } else {
+            1.0f
+        }
+        else -> 1.0f
+    }
+
+    val scaledWidth = bitmap.width * scale
+    val scaledHeight = bitmap.height * scale
+
+    val left = (pageWidth - scaledWidth) / 2f
+    val top = (pageHeight - scaledHeight) / 2f
+
+    val destRect = RectF(left, top, left + scaledWidth, top + scaledHeight)
+    canvas.drawBitmap(bitmap, null, destRect, null)
+    pdfDocument.finishPage(page)
+}
+
+private fun addImagesInGrid(pdfDocument: PdfDocument, imageUris: List<Uri>, context: Context) {
+    val a4Width = (PrintAttributes.MediaSize.ISO_A4.widthMils / 1000f * 72f).toInt()
+    val a4Height = (PrintAttributes.MediaSize.ISO_A4.heightMils / 1000f * 72f).toInt()
+    val spacing = 10f
+    var currentX = spacing
+    var currentY = spacing
+    var maxRowHeight = 0f
+    var page: PdfDocument.Page? = null
+
+    imageUris.forEach { uri ->
+        val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, _, _ -> decoder.isMutableRequired = true }
+
+        val scale = if (bitmap.width > a4Width || bitmap.height > a4Height) {
+            min((a4Width - 2 * spacing) / bitmap.width, (a4Height - 2 * spacing) / bitmap.height)
+        } else {
+            1.0f
+        }
+        val scaledWidth = bitmap.width * scale
+        val scaledHeight = bitmap.height * scale
+
+        if (page != null && currentX + scaledWidth + spacing > a4Width) {
+            currentX = spacing
+            currentY += maxRowHeight + spacing
+            maxRowHeight = 0f
+        }
+
+        if (page == null || currentY + scaledHeight + spacing > a4Height) {
+            page?.let { pdfDocument.finishPage(it) }
+            val newPageNumber = pdfDocument.pages.size + 1
+            page = pdfDocument.startPage(PdfDocument.PageInfo.Builder(a4Width, a4Height, newPageNumber).create())
+            currentX = spacing
+            currentY = spacing
+            maxRowHeight = 0f
+        }
+
+        val canvas = page!!.canvas
+        val destRect = RectF(currentX, currentY, currentX + scaledWidth, currentY + scaledHeight)
+        canvas.drawBitmap(bitmap, null, destRect, null)
+
+        currentX += scaledWidth + spacing
+        maxRowHeight = max(maxRowHeight, scaledHeight)
+
+        bitmap.recycle()
+    }
+    page?.let { pdfDocument.finishPage(it) }
 }
 
 private fun getFileDetails(context: Context, uri: Uri): Pair<String?, Long?> {

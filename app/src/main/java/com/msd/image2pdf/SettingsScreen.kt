@@ -73,13 +73,17 @@ fun SettingsScreen(navController: NavHostController) {
             Spacer(modifier = Modifier.height(8.dp))
 
             val radioOptions = listOf(
-                PageSize.A4 to "print friendly, images will be fit to A4.",
-                PageSize.IMAGE_SIZE to "Page size changes as per image size."
+                Triple(PageSize.A4, "A4 - Print Friendly", "Images will be fit to A4."),
+                Triple(PageSize.A4_SCALE_DOWN, "A4 - Scale Down", "Bigger images will fit to A4, Smaller ones stay as is"),
+                Triple(PageSize.A4_NO_SCALING, "A4 - No Scaling", "Images will be used as is"),
+                Triple(PageSize.A4_GRID, "A4 - Grid", "Multiple Images per page. Bigger images will fit to A4"),
+                Triple(PageSize.IMAGE_SIZE, "Image Size", "Page size changes as per image size."),
+
             )
             var selectedOption by remember { mutableStateOf(AppSettings.getPageSize(context)) }
 
             Column {
-                radioOptions.forEach { (size, description) ->
+                radioOptions.forEach { (size, title, description) ->
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -101,7 +105,7 @@ fun SettingsScreen(navController: NavHostController) {
                             }
                         )
                         Column(modifier = Modifier.padding(start = 16.dp)) {
-                            Text(text = size.name.replace("_", " ").let { it.substring(0, 1).uppercase() + it.substring(1).lowercase() })
+                            Text(text = title)
                             Text(text = description, style = MaterialTheme.typography.bodySmall)
                         }
                     }
