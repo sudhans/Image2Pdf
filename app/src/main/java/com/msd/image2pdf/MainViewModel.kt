@@ -18,6 +18,14 @@ class MainViewModel : ViewModel() {
         imageUris.addAll(uris)
     }
 
+    fun addImages(uris: List<Uri>) {
+        uris.forEach { uri ->
+            if (!imageUris.contains(uri)) {
+                imageUris.add(uri)
+            }
+        }
+    }
+
     fun removeImage(uri: Uri) {
         imageUris.remove(uri)
     }
