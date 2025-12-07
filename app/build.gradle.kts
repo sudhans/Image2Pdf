@@ -14,8 +14,8 @@ android {
         applicationId = "com.msd.image2pdf"
         minSdk = 33
         targetSdk = 36
-        versionCode = 6
-        versionName = "6.0"
+        versionCode = 7
+        versionName = "7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -17,6 +17,11 @@ Image2Pdf is a simple Android application that allows you to select images from 
     *   **A4 - No Scaling**: Centers each image on an A4 page without applying any scaling.
     *   **A4 - Grid**: Intelligently arranges multiple images on a single A4 page, creating a compact grid and saving space.
     *   **Image Size**: Creates a PDF where each page's size matches the original image's dimensions.
+*   **Customizable Page Numbers**: Tailor the page numbers to your needs with a variety of settings:
+    *   **Show/Hide Page Numbers**: Easily toggle the visibility of page numbers.
+    *   **Custom Starting Number**: Start your page numbering from any number between 1 and 999.
+    *   **Alignment Control**: Position your page numbers with horizontal (Start, Center, End) and vertical (Top, Bottom) alignment options.
+    *   **Prefix Text**: Add custom text (e.g., "Page") before each page number.
 *   **Organized Storage**: All generated PDFs are saved in a dedicated `Image2Pdf` folder inside your device's `Downloads` directory.
 *   **View and Manage PDFs**: Access and view all the PDFs you've created directly from the app, sorted by creation date.
 *   **Share Your App**: Easily share a link to the app with others via the overflow menu.
@@ -28,7 +33,7 @@ Image2Pdf is a simple Android application that allows you to select images from 
 2.  On the preview screen, you can:
     *   Tap the delete icon to remove an image.
     *   Tap the info icon to see file details.
-3.  Go to "Settings" from the overflow menu to select your desired PDF page option.
+3.  Go to "Settings" from the overflow menu to select your desired PDF page and page number options.
 4.  Tap the "Convert To PDF" button.
 5.  Enter a name for your PDF file and tap "Save."
 6.  After the PDF is created, you can find it in the `Downloads/Image2Pdf` folder on your device.

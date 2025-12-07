@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
+import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
@@ -325,7 +326,7 @@ private suspend fun createPdf(context: Context, imageUris: List<Uri>, fileName: 
                     val bitmap = ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
                         decoder.isMutableRequired = true
                     }
-                    addPageWithSingleImage(pdfDocument, index + 1, bitmap, pageSize)
+                    addPageWithSingleImage(pdfDocument, index + 1, bitmap, pageSize, context)
                     bitmap.recycle()
                 }
             }
@@ -343,7 +344,7 @@ private suspend fun createPdf(context: Context, imageUris: List<Uri>, fileName: 
     }
 }
 
-private fun addPageWithSingleImage(pdfDocument: PdfDocument, pageNumber: Int, bitmap: Bitmap, pageSize: PageSize) {
+private fun addPageWithSingleImage(pdfDocument: PdfDocument, pageNumber: Int, bitmap: Bitmap, pageSize: PageSize, context: Context) {
     val a4Width = (PrintAttributes.MediaSize.ISO_A4.widthMils / 1000f * 72f).toInt()
     val a4Height = (PrintAttributes.MediaSize.ISO_A4.heightMils / 1000f * 72f).toInt()
 
@@ -375,6 +376,12 @@ private fun addPageWithSingleImage(pdfDocument: PdfDocument, pageNumber: Int, bi
 
     val destRect = RectF(left, top, left + scaledWidth, top + scaledHeight)
     canvas.drawBitmap(bitmap, null, destRect, null)
+
+    val pageNumberSettings = AppSettings.getPageNumberSettings(context)
+    if (pageNumberSettings.showPageNumbers) {
+        drawPageNumber(canvas, pageNumber, pageNumberSettings, pageWidth, pageHeight)
+    }
+
     pdfDocument.finishPage(page)
 }
 
@@ -386,6 +393,7 @@ private fun addImagesInGrid(pdfDocument: PdfDocument, imageUris: List<Uri>, cont
     var currentY = spacing
     var maxRowHeight = 0f
     var page: PdfDocument.Page? = null
+    val pageNumberSettings = AppSettings.getPageNumberSettings(context)
 
     imageUris.forEach { uri ->
         val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, _, _ -> decoder.isMutableRequired = true }
@@ -405,7 +413,12 @@ private fun addImagesInGrid(pdfDocument: PdfDocument, imageUris: List<Uri>, cont
         }
 
         if (page == null || currentY + scaledHeight + spacing > a4Height) {
-            page?.let { pdfDocument.finishPage(it) }
+            page?.let {
+                if (pageNumberSettings.showPageNumbers) {
+                    drawPageNumber(it.canvas, pdfDocument.pages.size, pageNumberSettings, a4Width, a4Height)
+                }
+                pdfDocument.finishPage(it)
+            }
             val newPageNumber = pdfDocument.pages.size + 1
             page = pdfDocument.startPage(PdfDocument.PageInfo.Builder(a4Width, a4Height, newPageNumber).create())
             currentX = spacing
@@ -422,8 +435,35 @@ private fun addImagesInGrid(pdfDocument: PdfDocument, imageUris: List<Uri>, cont
 
         bitmap.recycle()
     }
-    page?.let { pdfDocument.finishPage(it) }
+    page?.let {
+        if (pageNumberSettings.showPageNumbers) {
+            drawPageNumber(it.canvas, pdfDocument.pages.size, pageNumberSettings, a4Width, a4Height)
+        }
+        pdfDocument.finishPage(it)
+    }
 }
+
+private fun drawPageNumber(canvas: android.graphics.Canvas, pageIndex: Int, settings: PageNumberSettings, pageWidth: Int, pageHeight: Int) {
+    val paint = Paint().apply {
+        textSize = 12f
+        color = android.graphics.Color.BLACK
+    }
+    val pageNumber = pageIndex + settings.startPageNumber - 1
+    val pageText = "${settings.prefixText} $pageNumber"
+
+    val x = when (settings.horizontalAlignment) {
+        HorizontalPageNumberAlignment.START -> 10f
+        HorizontalPageNumberAlignment.CENTER -> (pageWidth - paint.measureText(pageText)) / 2f
+        HorizontalPageNumberAlignment.END -> pageWidth - 10f - paint.measureText(pageText)
+    }
+    val y = when (settings.verticalAlignment) {
+        VerticalPageNumberAlignment.TOP -> 20f
+        VerticalPageNumberAlignment.BOTTOM -> pageHeight - 10f
+    }
+
+    canvas.drawText(pageText, x, y, paint)
+}
+
 
 private fun getFileDetails(context: Context, uri: Uri): Pair<String?, Long?> {
     context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
