@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
@@ -178,7 +179,12 @@ fun SettingsScreen(navController: NavHostController) {
                     expanded = showPageNumbersExpanded,
                     onExpandedChange = { showPageNumbersExpanded = !showPageNumbersExpanded }) {
                     TextField(
-                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        modifier = Modifier
+                            .menuAnchor(
+                                ExposedDropdownMenuAnchorType.PrimaryEditable,
+                                true
+                            )
+                            .fillMaxWidth(),
                         readOnly = true,
                         value = if (pageNumberSettings.showPageNumbers) "Yes" else "No",
                         onValueChange = {},
@@ -226,7 +232,12 @@ fun SettingsScreen(navController: NavHostController) {
                     expanded = verticalAlignmentExpanded,
                     onExpandedChange = { verticalAlignmentExpanded = !verticalAlignmentExpanded }) {
                     TextField(
-                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        modifier = Modifier
+                            .menuAnchor(
+                                ExposedDropdownMenuAnchorType.PrimaryEditable,
+                                enabled = pageNumberSettings.showPageNumbers
+                            )
+                            .fillMaxWidth(),
                         readOnly = true,
                         value = pageNumberSettings.verticalAlignment.name.lowercase()
                             .replaceFirstChar { it.uppercase() },
@@ -236,7 +247,7 @@ fun SettingsScreen(navController: NavHostController) {
                         enabled = pageNumberSettings.showPageNumbers
                     )
                     ExposedDropdownMenu(expanded = verticalAlignmentExpanded, onDismissRequest = { verticalAlignmentExpanded = false }) {
-                        VerticalPageNumberAlignment.values().forEach { alignment ->
+                        VerticalPageNumberAlignment.entries.forEach { alignment ->
                             DropdownMenuItem(
                                 text = { Text(alignment.name.lowercase().replaceFirstChar { it.uppercase() }) },
                                 onClick = {
@@ -259,7 +270,12 @@ fun SettingsScreen(navController: NavHostController) {
                         horizontalAlignmentExpanded = !horizontalAlignmentExpanded
                     }) {
                     TextField(
-                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        modifier = Modifier
+                            .menuAnchor(
+                                ExposedDropdownMenuAnchorType.PrimaryEditable,
+                                enabled = pageNumberSettings.showPageNumbers
+                            )
+                            .fillMaxWidth(),
                         readOnly = true,
                         value = pageNumberSettings.horizontalAlignment.name.lowercase()
                             .replaceFirstChar { it.uppercase() },
@@ -269,7 +285,7 @@ fun SettingsScreen(navController: NavHostController) {
                         enabled = pageNumberSettings.showPageNumbers
                     )
                     ExposedDropdownMenu(expanded = horizontalAlignmentExpanded, onDismissRequest = { horizontalAlignmentExpanded = false }) {
-                        HorizontalPageNumberAlignment.values().forEach { alignment ->
+                        HorizontalPageNumberAlignment.entries.forEach { alignment ->
                             DropdownMenuItem(
                                 text = {
                                     Text(
@@ -297,7 +313,7 @@ fun SettingsScreen(navController: NavHostController) {
                             AppSettings.savePageNumberSettings(context, pageNumberSettings)
                         }
                     },
-                    placeholder = { Text("Page")},
+                    placeholder = { Text("Page") },
                     label = { Text("Prefix Text") },
                     enabled = pageNumberSettings.showPageNumbers,
                     modifier = Modifier.fillMaxWidth()
