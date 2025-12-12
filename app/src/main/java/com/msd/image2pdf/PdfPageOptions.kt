@@ -20,6 +20,14 @@ enum class VerticalPageNumberAlignment {
     TOP, BOTTOM
 }
 
+// For Page Quality
+enum class JpegQuality(val value: Int) {
+    VERY_HIGH(100),
+    HIGH(80),
+    MEDIUM(70),
+    LOW(50)
+}
+
 data class PageNumberSettings(
     val showPageNumbers: Boolean = true,
     val startPageNumber: Int = 1,
@@ -41,6 +49,9 @@ object AppSettings {
     private const val KEY_HORIZONTAL_ALIGNMENT = "horizontalAlignment"
     private const val KEY_VERTICAL_ALIGNMENT = "verticalAlignment"
     private const val KEY_PREFIX_TEXT = "prefixText"
+
+    // Page Quality Key
+    private const val KEY_JPEG_QUALITY = "jpegQuality"
 
     // Page Size Get/Set
     fun getPageSize(context: Context): PageSize {
@@ -75,5 +86,19 @@ object AppSettings {
             putString(KEY_PREFIX_TEXT, settings.prefixText)
             apply()
         }
+    }
+
+    // Page Quality Get/Set
+    fun getJpegQuality(context: Context): JpegQuality {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return JpegQuality.valueOf(
+            prefs.getString(KEY_JPEG_QUALITY, JpegQuality.VERY_HIGH.name)
+                ?: JpegQuality.VERY_HIGH.name
+        )
+    }
+
+    fun setJpegQuality(context: Context, quality: JpegQuality) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_JPEG_QUALITY, quality.name).apply()
     }
 }

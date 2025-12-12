@@ -4,12 +4,8 @@ import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
-import android.graphics.Paint
-import android.graphics.RectF
-import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.os.Environment
-import android.print.PrintAttributes
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.widget.Toast
@@ -66,11 +62,76 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
+import com.itextpdf.text.Document
+import com.itextpdf.text.Element
+import com.itextpdf.text.Image
+import com.itextpdf.text.PageSize
+import com.itextpdf.text.Paragraph
+import com.itextpdf.text.pdf.PdfPageEventHelper
+import com.itextpdf.text.pdf.PdfWriter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.max
+import java.io.ByteArrayOutputStream
 import kotlin.math.min
+
+// Constants for page layout
+private const val HEADER_SPACE = 10f  // Points reserved for header
+private const val FOOTER_SPACE = 20f  // Points reserved for footer
+private const val PAGE_MARGINS = 20f  // Left/right margins
+
+/**
+ * Custom page event handler to position footer at the absolute bottom of each page
+ */
+private class FooterPageEventHelper(
+    private val pageNumberSettings: PageNumberSettings
+) : PdfPageEventHelper() {
+    private var pageNum = 0
+
+    override fun onStartPage(writer: PdfWriter?, document: Document?) {
+        pageNum++
+    }
+
+    override fun onEndPage(writer: PdfWriter?, document: Document?) {
+        val cb = writer?.directContent ?: return
+        cb.saveState()
+
+        // Get page width for positioning
+        val pageWidth = document?.pageSize?.width ?: PageSize.A4.width
+
+        // Position footer at the bottom of the page
+        val footerYPosition = FOOTER_SPACE / 2  // Y position from bottom
+
+        // Create footer text
+        val displayPageNumber = pageNum + pageNumberSettings.startPageNumber - 1
+        val pageText = "${pageNumberSettings.prefixText} $displayPageNumber".trim()
+
+        // Set font for footer
+        val bf = com.itextpdf.text.pdf.BaseFont.createFont(
+            com.itextpdf.text.pdf.BaseFont.HELVETICA,
+            com.itextpdf.text.pdf.BaseFont.WINANSI,
+            false
+        )
+        cb.setFontAndSize(bf, 10f)
+        cb.setRGBColorFill(0, 0, 0)  // Set black color for text
+
+        // Calculate X position based on alignment
+        val textWidth = bf.getWidthPoint(pageText, 10f)
+        val xPosition = when (pageNumberSettings.horizontalAlignment) {
+            HorizontalPageNumberAlignment.START -> PAGE_MARGINS
+            HorizontalPageNumberAlignment.CENTER -> (pageWidth - textWidth) / 2
+            HorizontalPageNumberAlignment.END -> pageWidth - PAGE_MARGINS - textWidth
+        }
+
+        // Draw text at bottom of page
+        cb.beginText()
+        cb.setTextMatrix(xPosition, footerYPosition)
+        cb.showText(pageText)
+        cb.endText()
+
+        cb.restoreState()
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -297,9 +358,34 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
     }
 }
 
+private fun getBitmapAsImage(uri: Uri, context: Context, jpegQuality: Int): Image {
+    val source = ImageDecoder.createSource(context.contentResolver, uri)
+    val bitmap = ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+        decoder.isMutableRequired = true
+    }
+
+    // Scale bitmap based on quality setting
+    val qualityScale = jpegQuality / 100f
+    val scaledBitmap = Bitmap.createScaledBitmap(
+        bitmap,
+        (bitmap.width * qualityScale).toInt(),
+        (bitmap.height * qualityScale).toInt(),
+        true
+    )
+    bitmap.recycle()
+
+    // Convert to ByteArray for iText
+    val stream = ByteArrayOutputStream()
+    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+    val imageBytes = stream.toByteArray()
+    scaledBitmap.recycle()
+
+    return Image.getInstance(imageBytes)
+}
+
+
 private suspend fun createPdf(context: Context, imageUris: List<Uri>, fileName: String): Pair<Boolean, String?> {
     return withContext(Dispatchers.IO) {
-        val pdfDocument = PdfDocument()
         try {
             if (imageUris.isEmpty()) {
                 return@withContext Pair(false, "No images selected")
@@ -315,152 +401,286 @@ private suspend fun createPdf(context: Context, imageUris: List<Uri>, fileName: 
             val pdfUri = resolver.insert(MediaStore.Files.getContentUri("external"), values)
                 ?: return@withContext Pair(false, "Could not create PDF file.")
 
-            val pageSize = AppSettings.getPageSize(context)
+            resolver.openOutputStream(pdfUri)?.use { outputStream ->
+                val pageSize = AppSettings.getPageSize(context)
+                val jpegQuality = AppSettings.getJpegQuality(context).value
+                val pageNumberSettings = AppSettings.getPageNumberSettings(context)
 
-            if (pageSize == PageSize.A4_GRID) {
-                addImagesInGrid(pdfDocument, imageUris, context)
-            } else {
-                imageUris.forEachIndexed { index, uri ->
-                    val source = ImageDecoder.createSource(context.contentResolver, uri)
-                    val bitmap = ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-                        decoder.isMutableRequired = true
-                    }
-                    addPageWithSingleImage(pdfDocument, index + 1, bitmap, pageSize, context)
-                    bitmap.recycle()
+                // Use A4 page size for all modes
+                val document = Document(PageSize.A4)
+
+                // Set margins based on page size
+                if (pageSize == com.msd.image2pdf.PageSize.A4_GRID) {
+                    document.setMargins(15f, 15f, 15f, 40f)
+                } else {
+                    document.setMargins(20f, 20f, 20f, 40f)
                 }
-            }
 
-            resolver.openOutputStream(pdfUri)?.use {
-                pdfDocument.writeTo(it)
+                val pdfWriter = PdfWriter.getInstance(document, outputStream)
+
+                // Register footer page event handler
+                if (pageNumberSettings.showPageNumbers) {
+                    pdfWriter.pageEvent = FooterPageEventHelper(pageNumberSettings)
+                }
+
+                document.open()
+
+                when (pageSize) {
+                    com.msd.image2pdf.PageSize.A4_GRID -> {
+                        addImagesInGridWithIText(
+                            document,
+                            imageUris,
+                            context,
+                            jpegQuality,
+                            pageNumberSettings
+                        )
+                    }
+
+                    else -> {
+                        imageUris.forEachIndexed { index, uri ->
+                            addPageWithSingleImageIText(
+                                document,
+                                uri,
+                                pageSize,
+                                context,
+                                jpegQuality,
+                                pageNumberSettings
+                            )
+                            if (index < imageUris.size - 1) {
+                                document.newPage()
+                            }
+                        }
+                    }
+                }
+
+                document.close()
             }
             Pair(true, null)
         } catch (e: Exception) {
             e.printStackTrace()
             Pair(false, e.message)
-        } finally {
-            pdfDocument.close()
         }
     }
 }
 
-private fun addPageWithSingleImage(pdfDocument: PdfDocument, pageNumber: Int, bitmap: Bitmap, pageSize: PageSize, context: Context) {
-    val a4Width = (PrintAttributes.MediaSize.ISO_A4.widthMils / 1000f * 72f).toInt()
-    val a4Height = (PrintAttributes.MediaSize.ISO_A4.heightMils / 1000f * 72f).toInt()
 
-    val (pageWidth, pageHeight) = when (pageSize) {
-        PageSize.A4, PageSize.A4_SCALE_DOWN, PageSize.A4_NO_SCALING -> a4Width to a4Height
-        PageSize.IMAGE_SIZE -> bitmap.width to bitmap.height
-        else -> a4Width to a4Height // Should not happen in this function
-    }
+private fun addPageWithSingleImageIText(
+    document: Document,
+    uri: Uri,
+    pageSize: com.msd.image2pdf.PageSize,
+    context: Context,
+    jpegQuality: Int,
+    pageNumberSettings: PageNumberSettings
+) {
+    try {
+        // Get Image from bitmap with quality scaling applied
+        val image = getBitmapAsImage(uri, context, jpegQuality)
 
-    val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
-    val page = pdfDocument.startPage(pageInfo)
-    val canvas = page.canvas
-
-    val scale = when (pageSize) {
-        PageSize.A4 -> min(pageWidth.toFloat() / bitmap.width, pageHeight.toFloat() / bitmap.height)
-        PageSize.A4_SCALE_DOWN -> if (bitmap.width > pageWidth || bitmap.height > pageHeight) {
-            min(pageWidth.toFloat() / bitmap.width, pageHeight.toFloat() / bitmap.height)
+        // Calculate available space for image (account for header and footer space)
+        val availableHeight = if (pageNumberSettings.showPageNumbers) {
+            PageSize.A4.height - HEADER_SPACE - FOOTER_SPACE
         } else {
-            1.0f
+            PageSize.A4.height - 40  // Original bottom margin only
         }
-        else -> 1.0f
+
+        // Scale image based on page size settings
+        when (pageSize) {
+            com.msd.image2pdf.PageSize.A4 -> {
+                val maxWidth = PageSize.A4.width - 2 * PAGE_MARGINS
+                val maxHeight = availableHeight
+                val scale = min(maxWidth / image.width, maxHeight / image.height)
+                image.scaleAbsolute(image.width * scale, image.height * scale)
+            }
+
+            com.msd.image2pdf.PageSize.A4_SCALE_DOWN -> {
+                val maxWidth = PageSize.A4.width - 2 * PAGE_MARGINS
+                val maxHeight = availableHeight
+                if (image.width > maxWidth || image.height > maxHeight) {
+                    val scale = min(maxWidth / image.width, maxHeight / image.height)
+                    image.scaleAbsolute(image.width * scale, image.height * scale)
+                }
+            }
+
+            else -> {
+                // For A4_GRID and other modes, scale to fit A4
+                val maxWidth = PageSize.A4.width - 2 * PAGE_MARGINS
+                val maxHeight = availableHeight
+                val scale = min(maxWidth / image.width, maxHeight / image.height)
+                image.scaleAbsolute(image.width * scale, image.height * scale)
+            }
+        }
+
+        // Center align the image
+        image.alignment = Element.ALIGN_CENTER
+
+        // Add header space only if footer is shown
+        if (pageNumberSettings.showPageNumbers) {
+            val headerSpacer = Paragraph(" ")
+            headerSpacer.spacingBefore = HEADER_SPACE
+            document.add(headerSpacer)
+        }
+
+        document.add(image)
+
+        // Footer is now handled by page event handler, no need to add it here
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
-
-    val scaledWidth = bitmap.width * scale
-    val scaledHeight = bitmap.height * scale
-
-    val left = (pageWidth - scaledWidth) / 2f
-    val top = (pageHeight - scaledHeight) / 2f
-
-    val destRect = RectF(left, top, left + scaledWidth, top + scaledHeight)
-    canvas.drawBitmap(bitmap, null, destRect, null)
-
-    val pageNumberSettings = AppSettings.getPageNumberSettings(context)
-    if (pageNumberSettings.showPageNumbers) {
-        drawPageNumber(canvas, pageNumber, pageNumberSettings, pageWidth, pageHeight)
-    }
-
-    pdfDocument.finishPage(page)
 }
 
-private fun addImagesInGrid(pdfDocument: PdfDocument, imageUris: List<Uri>, context: Context) {
-    val a4Width = (PrintAttributes.MediaSize.ISO_A4.widthMils / 1000f * 72f).toInt()
-    val a4Height = (PrintAttributes.MediaSize.ISO_A4.heightMils / 1000f * 72f).toInt()
-    val spacing = 10f
-    var currentX = spacing
-    var currentY = spacing
-    var maxRowHeight = 0f
-    var page: PdfDocument.Page? = null
-    val pageNumberSettings = AppSettings.getPageNumberSettings(context)
+private fun addImagesInGridWithIText(
+    document: Document,
+    imageUris: List<Uri>,
+    context: Context,
+    jpegQuality: Int,
+    pageNumberSettings: PageNumberSettings
+) {
+    val pageWidth = PageSize.A4.width
+    val pageHeight = PageSize.A4.height
+    val marginLeft = 15f
+    val marginRight = 15f
+    val marginTop = 15f
+    val marginBottom = 40f  // Extra space for footer
+    val spacingBetweenImages = 16f  // Minimum space between images (approx 16dp in points)
+
+    // Calculate available space
+    val availableWidth = pageWidth - marginLeft - marginRight
+    val availableHeight = pageHeight - marginTop - marginBottom
+
+    // Target 2 columns per row
+    val numColumns = 2
+    val maxImageWidth = (availableWidth - spacingBetweenImages * (numColumns - 1)) / numColumns
+    val maxImageHeight =
+        availableHeight / 3f  // Allow up to 3 rows per page (will be adapted based on image heights)
+
+    // Rows for current page. Each row is a list of Triples (Image, scaledWidth, scaledHeight)
+    var currentPageRows = mutableListOf<List<Triple<Image, Float, Float>>>()
+    var currentRow = mutableListOf<Triple<Image, Float, Float>>()
+    var totalHeightOnPage = 0f
+
+    fun flushCurrentPage() {
+        if (currentPageRows.isNotEmpty()) {
+            addGridTable(
+                document,
+                currentPageRows,
+                numColumns,
+                spacingBetweenImages,
+                pageNumberSettings
+            )
+            currentPageRows = mutableListOf()
+            totalHeightOnPage = 0f
+        }
+    }
 
     imageUris.forEach { uri ->
-        val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, _, _ -> decoder.isMutableRequired = true }
+        val image = getBitmapAsImage(uri, context, jpegQuality)
 
-        val scale = if (bitmap.width > a4Width || bitmap.height > a4Height) {
-            min((a4Width - 2 * spacing) / bitmap.width, (a4Height - 2 * spacing) / bitmap.height)
-        } else {
-            1.0f
-        }
-        val scaledWidth = bitmap.width * scale
-        val scaledHeight = bitmap.height * scale
+        // Maintain aspect ratio
+        val aspectRatio = image.height.toFloat() / image.width.toFloat()
+        var scaledWidth = maxImageWidth
+        var scaledHeight = scaledWidth * aspectRatio
 
-        if (page != null && currentX + scaledWidth + spacing > a4Width) {
-            currentX = spacing
-            currentY += maxRowHeight + spacing
-            maxRowHeight = 0f
+        if (scaledHeight > maxImageHeight) {
+            scaledHeight = maxImageHeight
+            scaledWidth = scaledHeight / aspectRatio
         }
 
-        if (page == null || currentY + scaledHeight + spacing > a4Height) {
-            page?.let {
-                if (pageNumberSettings.showPageNumbers) {
-                    drawPageNumber(it.canvas, pdfDocument.pages.size, pageNumberSettings, a4Width, a4Height)
-                }
-                pdfDocument.finishPage(it)
+        image.scaleAbsolute(scaledWidth, scaledHeight)
+
+        currentRow.add(Triple(image, scaledWidth, scaledHeight))
+
+        // When row is full (numColumns) or it's the last image, decide about adding the row
+        if (currentRow.size == numColumns) {
+            val rowHeight = currentRow.maxOf { it.third }
+            // If this row fits on current page, add it, otherwise flush page and start new
+            if (totalHeightOnPage + rowHeight + spacingBetweenImages <= availableHeight || currentPageRows.isEmpty()) {
+                currentPageRows.add(currentRow.toList())
+                totalHeightOnPage += rowHeight + spacingBetweenImages
+            } else {
+                // Flush current page and start a new one
+                flushCurrentPage()
+                document.newPage()
+                currentPageRows.add(currentRow.toList())
+                totalHeightOnPage += rowHeight + spacingBetweenImages
             }
-            val newPageNumber = pdfDocument.pages.size + 1
-            page = pdfDocument.startPage(PdfDocument.PageInfo.Builder(a4Width, a4Height, newPageNumber).create())
-            currentX = spacing
-            currentY = spacing
-            maxRowHeight = 0f
+            currentRow = mutableListOf()
         }
-
-        val canvas = page!!.canvas
-        val destRect = RectF(currentX, currentY, currentX + scaledWidth, currentY + scaledHeight)
-        canvas.drawBitmap(bitmap, null, destRect, null)
-
-        currentX += scaledWidth + spacing
-        maxRowHeight = max(maxRowHeight, scaledHeight)
-
-        bitmap.recycle()
     }
-    page?.let {
-        if (pageNumberSettings.showPageNumbers) {
-            drawPageNumber(it.canvas, pdfDocument.pages.size, pageNumberSettings, a4Width, a4Height)
+
+    // Handle leftover images in the last incomplete row
+    if (currentRow.isNotEmpty()) {
+        val rowHeight = currentRow.maxOf { it.third }
+        if (totalHeightOnPage + rowHeight + spacingBetweenImages <= availableHeight || currentPageRows.isEmpty()) {
+            currentPageRows.add(currentRow.toList())
+            totalHeightOnPage += rowHeight + spacingBetweenImages
+        } else {
+            flushCurrentPage()
+            document.newPage()
+            currentPageRows.add(currentRow.toList())
+            totalHeightOnPage += rowHeight + spacingBetweenImages
         }
-        pdfDocument.finishPage(it)
+    }
+
+    // Flush remaining rows to document
+    if (currentPageRows.isNotEmpty()) {
+        addGridTable(
+            document,
+            currentPageRows,
+            numColumns,
+            spacingBetweenImages,
+            pageNumberSettings
+        )
     }
 }
 
-private fun drawPageNumber(canvas: android.graphics.Canvas, pageIndex: Int, settings: PageNumberSettings, pageWidth: Int, pageHeight: Int) {
-    val paint = Paint().apply {
-        textSize = 12f
-        color = android.graphics.Color.BLACK
-    }
-    val pageNumber = pageIndex + settings.startPageNumber - 1
-    val pageText = "${settings.prefixText} $pageNumber"
+private fun addGridTable(
+    document: Document,
+    rows: List<List<Triple<Image, Float, Float>>>,
+    numColumns: Int,
+    spacing: Float,
+    pageNumberSettings: PageNumberSettings
+) {
+    // Use PdfPTable to place images side-by-side
+    val table = com.itextpdf.text.pdf.PdfPTable(numColumns)
+    table.widthPercentage = 100f
+    table.spacingBefore = spacing
+    table.spacingAfter = spacing
+    table.defaultCell.border = com.itextpdf.text.pdf.PdfPCell.NO_BORDER
+    table.defaultCell.horizontalAlignment = Element.ALIGN_CENTER
 
-    val x = when (settings.horizontalAlignment) {
-        HorizontalPageNumberAlignment.START -> 10f
-        HorizontalPageNumberAlignment.CENTER -> (pageWidth - paint.measureText(pageText)) / 2f
-        HorizontalPageNumberAlignment.END -> pageWidth - 10f - paint.measureText(pageText)
-    }
-    val y = when (settings.verticalAlignment) {
-        VerticalPageNumberAlignment.TOP -> 20f
-        VerticalPageNumberAlignment.BOTTOM -> pageHeight - 10f
+    // Add header spacer if footer/page numbers are shown
+    if (pageNumberSettings.showPageNumbers) {
+        val headerSpacer = Paragraph(" ")
+        headerSpacer.spacingBefore = HEADER_SPACE
+        document.add(headerSpacer)
     }
 
-    canvas.drawText(pageText, x, y, paint)
+    rows.forEach { row ->
+        val rowHeight = row.maxOf { it.third }
+        // For each column in the row
+        for (i in 0 until numColumns) {
+            if (i < row.size) {
+                val (image, _, _) = row[i]
+                val cell = com.itextpdf.text.pdf.PdfPCell()
+                cell.border = com.itextpdf.text.pdf.PdfPCell.NO_BORDER
+                cell.setPadding(spacing)
+                cell.horizontalAlignment = Element.ALIGN_CENTER
+                cell.verticalAlignment = Element.ALIGN_MIDDLE
+                cell.minimumHeight = rowHeight
+                // Add the image element to the cell
+                cell.addElement(image)
+                table.addCell(cell)
+            } else {
+                // empty cell for missing columns in last row
+                val emptyCell = com.itextpdf.text.pdf.PdfPCell()
+                emptyCell.border = com.itextpdf.text.pdf.PdfPCell.NO_BORDER
+                emptyCell.minimumHeight = rowHeight
+                table.addCell(emptyCell)
+            }
+        }
+    }
+
+    document.add(table)
 }
 
 

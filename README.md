@@ -14,9 +14,7 @@ Image2Pdf is a simple Android application that allows you to select images from 
 *   **Flexible PDF Page Sizing**: Take full control over your PDF output with multiple page-sizing options:
     *   **A4 - Print Friendly**: Automatically scales each image (up or down) to best fit a standard A4 page.
     *   **A4 - Scale Down**: Fits larger images to an A4 page while keeping smaller images at their original size.
-    *   **A4 - No Scaling**: Centers each image on an A4 page without applying any scaling.
     *   **A4 - Grid**: Intelligently arranges multiple images on a single A4 page, creating a compact grid and saving space.
-    *   **Image Size**: Creates a PDF where each page's size matches the original image's dimensions.
 *   **Customizable Page Numbers**: Tailor the page numbers to your needs with a variety of settings:
     *   **Show/Hide Page Numbers**: Easily toggle the visibility of page numbers.
     *   **Custom Starting Number**: Start your page numbering from any number between 1 and 999.

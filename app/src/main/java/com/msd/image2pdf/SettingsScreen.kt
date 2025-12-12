@@ -102,12 +102,6 @@ fun SettingsScreen(navController: NavHostController) {
                         "A4 - Scale Down",
                         "Bigger images will fit to A4, Smaller ones stay as is"
                     ),
-                    Triple(PageSize.A4_NO_SCALING, "A4 - No Scaling", "Images will be used as is"),
-                    Triple(
-                        PageSize.IMAGE_SIZE,
-                        "Image Size",
-                        "Page size changes as per image size."
-                    ),
                     Triple(
                         PageSize.A4_GRID,
                         "A4 - Grid",
@@ -139,6 +133,64 @@ fun SettingsScreen(navController: NavHostController) {
                         )
                         Column(modifier = Modifier.padding(start = 16.dp)) {
                             Text(text = title)
+                            Text(text = description, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                "Page Quality",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Column(
+                modifier = Modifier
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outline,
+                        shape = MaterialTheme.shapes.medium
+                    )
+                    .padding(16.dp)
+            ) {
+                val qualityRadioOptions = listOf(
+                    Pair(JpegQuality.VERY_HIGH, "JPEG Quality will be 100%"),
+                    Pair(JpegQuality.HIGH, "JPEG Quality will be 80%"),
+                    Pair(JpegQuality.MEDIUM, "JPEG Quality will be 70%"),
+                    Pair(JpegQuality.LOW, "JPEG Quality will be 50%")
+                )
+                var selectedQuality by remember { mutableStateOf(AppSettings.getJpegQuality(context)) }
+
+                qualityRadioOptions.forEach { (quality, description) ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = (selectedQuality == quality),
+                                onClick = {
+                                    selectedQuality = quality
+                                    AppSettings.setJpegQuality(context, quality)
+                                }
+                            )
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = (selectedQuality == quality),
+                            onClick = {
+                                selectedQuality = quality
+                                AppSettings.setJpegQuality(context, quality)
+                            }
+                        )
+                        Column(modifier = Modifier.padding(start = 16.dp)) {
+                            Text(
+                                text = quality.name.replace("_", " ").let {
+                                    it.substring(0, 1).uppercase() + it.substring(1).lowercase()
+                                })
                             Text(text = description, style = MaterialTheme.typography.bodySmall)
                         }
                     }
@@ -307,7 +359,7 @@ fun SettingsScreen(navController: NavHostController) {
 
                 TextField(
                     value = pageNumberSettings.prefixText,
-                    onValueChange = {
+                    onValueChange = { 
                         if (it.length <= 10) {
                             pageNumberSettings = pageNumberSettings.copy(prefixText = it)
                             AppSettings.savePageNumberSettings(context, pageNumberSettings)
