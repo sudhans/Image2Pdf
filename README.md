@@ -10,6 +10,7 @@ Image2Pdf is a simple Android application that allows you to select images from 
 
 *   **Select Multiple Images**: Pick one or more images from your device's gallery.
 *   **Preview and Manage Images**: View your selected images in a list. Remove any unwanted images by tapping the delete icon.
+    * **Rotation** - Images can be rotated by 90 degrees
 *   **Image Details**: View properties of each selected image, including its name, size, and location.
 *   **Flexible PDF Page Sizing**: Take full control over your PDF output with multiple page-sizing options:
     *   **A4 - Print Friendly**: Automatically scales each image (up or down) to best fit a standard A4 page.
