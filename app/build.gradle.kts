@@ -13,6 +13,7 @@ android {
     defaultConfig {
         applicationId = "com.msd.image2pdf"
         minSdk = 33
+        targetSdk = 37
         versionCode = 8
         versionName = "8.0"
 
