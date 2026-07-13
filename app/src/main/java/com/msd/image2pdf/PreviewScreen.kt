@@ -48,7 +48,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -150,7 +149,6 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
     var showDeleteConfirmDialog by remember { mutableStateOf<Uri?>(null) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var isCreatingPdf by remember { mutableStateOf(false) }
-    val imageRotations = remember { mutableStateMapOf<Uri, Int>() }
     val maxImageHeight = if (LocalWindowInfo.current.containerSize.width > 600) 200.dp else 120.dp
     val listState = rememberLazyListState()
 
@@ -219,7 +217,7 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
                     .weight(1f)
             ) {
                 items(viewModel.imageUris, key = { it.hashCode() }) { uri ->
-                    val rotationDegrees = imageRotations[uri] ?: 0
+                    val rotationDegrees = viewModel.imageRotations[uri] ?: 0
                     Card(
                         modifier = Modifier
                             .padding(4.dp)
@@ -234,9 +232,7 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
                                     Icon(Icons.Default.Info, contentDescription = "Info")
                                 }
                                 IconButton(
-                                    onClick = {
-                                        imageRotations[uri] = (rotationDegrees + 90) % 360
-                                    }
+                                    onClick = { viewModel.rotateImage(uri) }
                                 ) {
                                     Icon(
                                         Icons.AutoMirrored.Filled.RotateRight,
@@ -309,7 +305,7 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
                             val (success, errorMessage) = createPdf(
                                 context,
                                 viewModel.imageUris,
-                                imageRotations.toMap(),
+                                viewModel.imageRotations.toMap(),
                                 pdfFileName
                             )
                             withContext(Dispatchers.Main) {
@@ -347,7 +343,6 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
                 TextButton(
                     onClick = {
                         viewModel.removeImage(uriToDelete)
-                        imageRotations.remove(uriToDelete)
                         if (viewModel.imageUris.isEmpty()) {
                             navController.popBackStack()
                         }

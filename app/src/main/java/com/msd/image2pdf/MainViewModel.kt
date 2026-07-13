@@ -5,16 +5,19 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class MainViewModel : ViewModel() {
     val imageUris = mutableStateListOf<Uri>()
+    val imageRotations = mutableStateMapOf<Uri, Int>()
     val pdfFiles = mutableStateListOf<Uri>()
 
     fun onImagesSelected(uris: List<Uri>) {
         imageUris.clear()
+        imageRotations.clear()
         imageUris.addAll(uris)
     }
 
@@ -28,6 +31,11 @@ class MainViewModel : ViewModel() {
 
     fun removeImage(uri: Uri) {
         imageUris.remove(uri)
+        imageRotations.remove(uri)
+    }
+
+    fun rotateImage(uri: Uri) {
+        imageRotations[uri] = ((imageRotations[uri] ?: 0) + 90) % 360
     }
 
     suspend fun findPdfFiles(context: Context) {
