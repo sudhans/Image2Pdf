@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
+import android.graphics.Matrix
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
@@ -24,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.RotateRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
@@ -46,6 +48,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -53,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -60,6 +64,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.graphics.scale
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.itextpdf.text.Document
@@ -145,6 +150,7 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
     var showDeleteConfirmDialog by remember { mutableStateOf<Uri?>(null) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var isCreatingPdf by remember { mutableStateOf(false) }
+    val imageRotations = remember { mutableStateMapOf<Uri, Int>() }
     val maxImageHeight = if (LocalWindowInfo.current.containerSize.width > 600) 200.dp else 120.dp
     val listState = rememberLazyListState()
 
@@ -213,6 +219,7 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
                     .weight(1f)
             ) {
                 items(viewModel.imageUris, key = { it.hashCode() }) { uri ->
+                    val rotationDegrees = imageRotations[uri] ?: 0
                     Card(
                         modifier = Modifier
                             .padding(4.dp)
@@ -222,8 +229,20 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            IconButton(onClick = { showDialog = uri }) {
-                                Icon(Icons.Default.Info, contentDescription = "Info")
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                IconButton(onClick = { showDialog = uri }) {
+                                    Icon(Icons.Default.Info, contentDescription = "Info")
+                                }
+                                IconButton(
+                                    onClick = {
+                                        imageRotations[uri] = (rotationDegrees + 90) % 360
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.RotateRight,
+                                        contentDescription = "Rotate image"
+                                    )
+                                }
                             }
                             AsyncImage(
                                 model = uri,
@@ -232,6 +251,7 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
                                 modifier = Modifier
                                     .weight(1f)
                                     .padding(4.dp)
+                                    .graphicsLayer { rotationZ = rotationDegrees.toFloat() }
                                     .sizeIn(maxHeight = maxImageHeight)
                             )
                             IconButton(onClick = { showDeleteConfirmDialog = uri }) {
@@ -286,7 +306,12 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
                         showFileNameDialog = false
                         scope.launch {
                             isCreatingPdf = true
-                            val (success, errorMessage) = createPdf(context, viewModel.imageUris, pdfFileName)
+                            val (success, errorMessage) = createPdf(
+                                context,
+                                viewModel.imageUris,
+                                imageRotations.toMap(),
+                                pdfFileName
+                            )
                             withContext(Dispatchers.Main) {
                                 isCreatingPdf = false
                                 if (success) {
@@ -322,6 +347,7 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
                 TextButton(
                     onClick = {
                         viewModel.removeImage(uriToDelete)
+                        imageRotations.remove(uriToDelete)
                         if (viewModel.imageUris.isEmpty()) {
                             navController.popBackStack()
                         }
@@ -358,21 +384,33 @@ fun PreviewScreen(viewModel: MainViewModel, navController: NavHostController) {
     }
 }
 
-private fun getBitmapAsImage(uri: Uri, context: Context, jpegQuality: Int): Image {
+private fun getBitmapAsImage(
+    uri: Uri,
+    context: Context,
+    jpegQuality: Int,
+    rotationDegrees: Int
+): Image {
     val source = ImageDecoder.createSource(context.contentResolver, uri)
     val bitmap = ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
         decoder.isMutableRequired = true
     }
+    val normalizedRotation = ((rotationDegrees % 360) + 360) % 360
+    val rotatedBitmap = if (normalizedRotation == 0) {
+        bitmap
+    } else {
+        val matrix = Matrix().apply { postRotate(normalizedRotation.toFloat()) }
+        Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true).also {
+            bitmap.recycle()
+        }
+    }
 
     // Scale bitmap based on quality setting
     val qualityScale = jpegQuality / 100f
-    val scaledBitmap = Bitmap.createScaledBitmap(
-        bitmap,
-        (bitmap.width * qualityScale).toInt(),
-        (bitmap.height * qualityScale).toInt(),
-        true
+    val scaledBitmap = rotatedBitmap.scale(
+        (rotatedBitmap.width * qualityScale).toInt(),
+        (rotatedBitmap.height * qualityScale).toInt()
     )
-    bitmap.recycle()
+    rotatedBitmap.recycle()
 
     // Convert to ByteArray for iText
     val stream = ByteArrayOutputStream()
@@ -384,7 +422,12 @@ private fun getBitmapAsImage(uri: Uri, context: Context, jpegQuality: Int): Imag
 }
 
 
-private suspend fun createPdf(context: Context, imageUris: List<Uri>, fileName: String): Pair<Boolean, String?> {
+private suspend fun createPdf(
+    context: Context,
+    imageUris: List<Uri>,
+    imageRotations: Map<Uri, Int>,
+    fileName: String
+): Pair<Boolean, String?> {
     return withContext(Dispatchers.IO) {
         try {
             if (imageUris.isEmpty()) {
@@ -430,6 +473,7 @@ private suspend fun createPdf(context: Context, imageUris: List<Uri>, fileName: 
                         addImagesInGridWithIText(
                             document,
                             imageUris,
+                            imageRotations,
                             context,
                             jpegQuality,
                             pageNumberSettings
@@ -441,6 +485,7 @@ private suspend fun createPdf(context: Context, imageUris: List<Uri>, fileName: 
                             addPageWithSingleImageIText(
                                 document,
                                 uri,
+                                imageRotations[uri] ?: 0,
                                 pageSize,
                                 context,
                                 jpegQuality,
@@ -467,6 +512,7 @@ private suspend fun createPdf(context: Context, imageUris: List<Uri>, fileName: 
 private fun addPageWithSingleImageIText(
     document: Document,
     uri: Uri,
+    rotationDegrees: Int,
     pageSize: com.msd.image2pdf.PageSize,
     context: Context,
     jpegQuality: Int,
@@ -474,7 +520,7 @@ private fun addPageWithSingleImageIText(
 ) {
     try {
         // Get Image from bitmap with quality scaling applied
-        val image = getBitmapAsImage(uri, context, jpegQuality)
+        val image = getBitmapAsImage(uri, context, jpegQuality, rotationDegrees)
 
         // Calculate available space for image (account for header and footer space)
         val availableHeight = if (pageNumberSettings.showPageNumbers) {
@@ -531,6 +577,7 @@ private fun addPageWithSingleImageIText(
 private fun addImagesInGridWithIText(
     document: Document,
     imageUris: List<Uri>,
+    imageRotations: Map<Uri, Int>,
     context: Context,
     jpegQuality: Int,
     pageNumberSettings: PageNumberSettings
@@ -573,10 +620,10 @@ private fun addImagesInGridWithIText(
     }
 
     imageUris.forEach { uri ->
-        val image = getBitmapAsImage(uri, context, jpegQuality)
+        val image = getBitmapAsImage(uri, context, jpegQuality, imageRotations[uri] ?: 0)
 
         // Maintain aspect ratio
-        val aspectRatio = image.height.toFloat() / image.width.toFloat()
+        val aspectRatio = image.height / image.width
         var scaledWidth = maxImageWidth
         var scaledHeight = scaledWidth * aspectRatio
 
@@ -612,12 +659,10 @@ private fun addImagesInGridWithIText(
         val rowHeight = currentRow.maxOf { it.third }
         if (totalHeightOnPage + rowHeight + spacingBetweenImages <= availableHeight || currentPageRows.isEmpty()) {
             currentPageRows.add(currentRow.toList())
-            totalHeightOnPage += rowHeight + spacingBetweenImages
         } else {
             flushCurrentPage()
             document.newPage()
             currentPageRows.add(currentRow.toList())
-            totalHeightOnPage += rowHeight + spacingBetweenImages
         }
     }
 
